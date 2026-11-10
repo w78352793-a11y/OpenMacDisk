@@ -1,4 +1,8 @@
-# OpenMacDisk
+<p align="center">
+  <img src="_build/splash.png" alt="OpenMacDisk" width="144" height="144">
+</p>
+
+<h1 align="center">OpenMacDisk</h1>
 
 开源、纯本地的 **macOS 磁盘镜像（`.dmg`）读写工具**，MIT 许可。原生 Windows 桌面程序，不是网页套壳。
 
