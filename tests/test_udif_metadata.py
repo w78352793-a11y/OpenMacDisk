@@ -12,6 +12,7 @@ import plistlib
 import struct
 import tempfile
 import unittest
+import zlib
 
 from openmacdisk import writer
 from openmacdisk.image import Disk
@@ -255,6 +256,75 @@ class TestUDIFMetadata(unittest.TestCase):
             with Disk(p) as d:
                 self.assertEqual(d.reader.read(0, 64 * 1024), expect)
             self.assertEqual(tail_meta(p)[2]['Name'], STD_NAME)
+
+
+class TestDataForkChecksum(unittest.TestCase):
+    """回归：源镜像带 type=2 数据叉校验和时，重排后 CRC 必须跟着更新。
+
+    真实 Apple DMG 的 koly 会给出 type=2 + 数据叉 CRC32；以前 eXpand /
+    Compress 直接沿用源值，数据叉一旦重排就成了过期 CRC，macOS 挂载时会
+    拿这个不匹配的值拒绝打开。
+    """
+
+    @staticmethod
+    def _typed(base, out):
+        with open(base, 'rb') as f:
+            data = f.read()
+        k = bytearray(data[-512:])
+        dl = struct.unpack_from('>Q', k, 0x20)[0]
+        crc = zlib.crc32(data[:dl]) & 0xFFFFFFFF
+        k[0x50:0xD8] = bytes(0xD8 - 0x50)
+        struct.pack_into('>II', k, 0x50, 2, 32)
+        struct.pack_into('>I', k, 0x58, crc)
+        with open(out, 'wb') as f:
+            f.write(data[:-512] + bytes(k))
+        return crc
+
+    @staticmethod
+    def _crc(path):
+        with open(path, 'rb') as f:
+            data = f.read()
+        k = data[-512:]
+        dl = struct.unpack_from('>Q', k, 0x20)[0]
+        return (struct.unpack_from('>II', k, 0x50),
+                struct.unpack_from('>I', k, 0x58)[0],
+                zlib.crc32(data[:dl]) & 0xFFFFFFFF,
+                struct.unpack_from('>II', k, 0x160))
+
+    def test_crc_matches_real_data_fork_after_roundtrip(self):
+        d = tempfile.mkdtemp(prefix='omd_dfcrc_')
+        payload = os.path.join(d, 'payload.bin')
+        with open(payload, 'wb') as f:
+            f.write(b'CHECKSUM-REGRESSION-' * 6000)
+        base = os.path.join(d, 'base.dmg')
+        writer.create_dmg(
+            base,
+            [writer.Entry(path='payload.bin',
+                          size=os.path.getsize(payload), src=payload)],
+            'CRCVOL', compressed=True)
+        typed = os.path.join(d, 'typed.dmg')
+        src_crc = self._typed(base, typed)
+        self.assertEqual(self._crc(typed)[1], src_crc)
+
+        expanded = os.path.join(d, 'expanded.dmg')
+        writer.expand_to_editable_dmg(typed, expanded)
+        compressed = os.path.join(d, 'compressed.dmg')
+        writer.compress_to_dmg(expanded, compressed)
+
+        for p in (expanded, compressed):
+            typ, stored, actual, main = self._crc(p)
+            self.assertEqual(typ, (2, 32), 'type=2 的源必须继续提供校验和')
+            self.assertEqual(stored, actual,
+                             '数据叉 CRC32 必须与实际写出的数据一致')
+            self.assertEqual(main, (0, 0),
+                             'koly 变了以后源主校验和必须清零')
+        self.assertNotEqual(self._crc(expanded)[1], src_crc,
+                            'eXpand 后数据叉已重排，CRC 不应还是源值')
+        with open(typed, 'rb') as f:
+            before = f.read()
+        with open(compressed, 'rb') as f:
+            after = f.read()
+        self.assertEqual(before, after, '无编辑往返仍须逐字节一致')
 
 
 if __name__ == '__main__':
