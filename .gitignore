@@ -1,0 +1,42 @@
+# ===== 构建产物 =====
+build/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+*.spec.bak
+
+# ===== 可执行文件与安装包（通过 GitHub Releases 分发，不进源码仓库） =====
+*.exe
+*.pkg
+*.msi
+OpenMacDisk-*-portable.zip
+
+# ===== 真实镜像与验证产物（含第三方版权内容，严禁公开） =====
+_verify/
+
+# ===== 竞品逆向/侦察分析（合规红线，绝不公开） =====
+_analysis/
+TRANSMAC_ANALYSIS.md
+
+# ===== 本地用户设置（便携版运行时生成，含个人偏好） =====
+config.json
+
+# ===== 构建目录：只放行公开可复现所需的文件 =====
+# 其余（截图、私有素材、真实 DMG 提取的原始字节、旧 exe、临时探针）一律不公开
+_build/*
+!_build/OpenMacDisk.spec
+!_build/version_info.txt
+!_build/icon.ico
+!_build/splash.png
+
+# ===== 工作区元数据 =====
+.workbuddy/
+
+# ===== 系统文件 =====
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ===== 本地工具（gh CLI 便携版，不公开） =====
+_tools/

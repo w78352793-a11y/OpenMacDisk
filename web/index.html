@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenMacDisk · 开源 Mac 磁盘 / DMG 浏览器</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --line:#e2e5ea; --text:#1b1f26;
+  --muted:#6b7280; --accent:#2563eb; --accent-soft:#e8efff;
+  --hover:#f0f4ff; --ok:#0f766e; --warn:#b45309;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:13px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+header{background:var(--panel);border-bottom:1px solid var(--line);
+  padding:12px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:16px;font-weight:700;letter-spacing:.3px;margin-right:8px}
+.logo span{color:var(--accent)}
+.tag{font-size:11px;color:var(--muted);border:1px solid var(--line);
+  border-radius:20px;padding:2px 9px}
+#path{flex:1;min-width:280px;padding:8px 11px;border:1px solid var(--line);
+  border-radius:6px;background:#fbfcfe;color:var(--text);font-family:Consolas,monospace;font-size:12px}
+button{padding:8px 14px;border:1px solid var(--line);border-radius:6px;
+  background:var(--panel);color:var(--text);cursor:pointer;font-size:12px}
+button:hover{background:var(--hover);border-color:#c3cfe8}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{background:#1d4fd7}
+button:disabled{opacity:.5;cursor:not-allowed}
+main{display:grid;grid-template-columns:310px 1fr;gap:12px;padding:12px 18px;height:calc(100vh - 116px)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  overflow:hidden;display:flex;flex-direction:column}
+.panel>h2{margin:0;padding:10px 14px;font-size:12px;font-weight:600;
+  color:var(--muted);letter-spacing:.6px;border-bottom:1px solid var(--line);
+  background:#fafbfc;text-transform:uppercase}
+#info{padding:12px 14px;overflow:auto;font-size:12px}
+.kv{display:flex;justify-content:space-between;gap:8px;padding:3px 0}
+.kv b{font-weight:500;color:var(--muted)}
+.kv span{text-align:right;word-break:break-all}
+.sec{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.sec h3{margin:0 0 6px;font-size:11px;color:var(--muted);font-weight:600}
+.row{padding:5px 8px;border-radius:5px;background:#f8f9fb;margin-bottom:4px}
+.row .t{font-weight:600}
+.row .d{color:var(--muted);font-size:11px}
+.empty{color:var(--muted);padding:20px;text-align:center}
+.toolbar{padding:8px 12px;border-bottom:1px solid var(--line);display:flex;
+  gap:8px;align-items:center;flex-wrap:wrap}
+#crumb{flex:1;font-family:Consolas,monospace;font-size:12px;color:var(--accent);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#filter{width:190px;padding:6px 9px;border:1px solid var(--line);
+  border-radius:5px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{text-align:left;padding:8px 12px;color:var(--muted);font-weight:600;
+  background:#fafbfc;border-bottom:1px solid var(--line);position:sticky;top:0}
+tbody td{padding:7px 12px;border-bottom:1px solid #f0f1f4}
+tbody tr{cursor:default}
+tbody tr:hover{background:var(--hover)}
+tbody tr.folder{cursor:pointer}
+tbody tr.sel{background:var(--accent-soft)}
+.icon{width:18px;display:inline-block;color:var(--accent)}
+.muted{color:var(--muted)}
+.right{text-align:right}
+#files{overflow:auto;flex:1}
+footer{padding:6px 18px;font-size:11px;color:var(--muted);
+  border-top:1px solid var(--line);background:var(--panel);
+  display:flex;justify-content:space-between}
+.badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;
+  background:var(--accent-soft);color:var(--accent)}
+.err{color:var(--warn);font-size:11px;margin-top:6px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Open<span>MacDisk</span></div>
+  <span class="tag">MIT · 纯本地 · 只读</span>
+  <input id="path" placeholder="粘贴 DMG / IMG 镜像完整路径，例如 D:\桌面\xxx.dmg" spellcheck="false">
+  <button class="primary" id="btnOpen">打开镜像</button>
+  <button id="btnDemo">填充示例路径</button>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>磁盘 / 卷</h2>
+    <div id="info"><div class="empty">尚未打开镜像<br><span style="font-size:11px">支持 UDIF/DMG、裸磁盘镜像、ISO</span></div></div>
+  </section>
+
+  <section class="panel">
+    <h2>文件浏览</h2>
+    <div class="toolbar">
+      <button id="btnUp" disabled>↑ 上级</button>
+      <button id="btnReload" disabled>刷新</button>
+      <div id="crumb">/</div>
+      <input id="filter" placeholder="过滤当前目录…" disabled>
+      <button id="btnDownload" disabled>导出选中文件</button>
+    </div>
+    <div id="files">
+      <table><thead><tr><th style="width:45%">名称</th><th>类型</th>
+        <th class="right">大小</th><th class="right">项目数</th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="4" class="empty">打开镜像后显示内容</td></tr></tbody></table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div id="status">就绪 · 解析引擎运行于本机，不上传任何数据</div>
+  <div>OpenMacDisk v1.0 · HFS+/HFSX 只读 · UDIF / APM / GPT</div>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let IMG = '', DIR = '', SEL = null, ITEMS = [], HISTORY = [];
+
+function status(t){ $('status').textContent = t; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function api(path){ return fetch(path).then(r => r.json()); }
+function q(o){ return new URLSearchParams(o).toString(); }
+function hum(n){ const u=['B','KB','MB','GB','TB']; let i=0; while(n>=1024&&i<u.length-1){n/=1024;i++} return n.toFixed(2)+' '+u[i]; }
+
+async function openImage(){
+  IMG = $('path').value.trim().replace(/^"|"$/g,'');
+  if(!IMG){ status('请先填写镜像路径'); return; }
+  status('正在解析镜像（大文件首次打开需要几秒）…');
+  $('btnOpen').disabled = true;
+  try{
+    const d = await api('/api/info?'+q({image:IMG}));
+    if(!d.ok) throw new Error(d.error);
+    renderInfo(d);
+    localStorage.setItem('omd_last', IMG);
+    HISTORY = []; DIR = '';
+    await loadDir('');
+    $('btnUp').disabled = $('btnReload').disabled = false;
+    $('filter').disabled = false;
+    status('已打开：'+IMG+'  ·  '+d.volumes.length+' 个卷');
+  }catch(e){ status('打开失败：'+e.message); $('info').innerHTML = '<div class="err">'+esc(e.message)+'</div>'; }
+  finally{ $('btnOpen').disabled = false; }
+}
+
+function renderInfo(d){
+  let h = '<div class="kv"><b>容器格式</b><span>'+esc(d.format)+'</span></div>'
+        + '<div class="kv"><b>文件大小</b><span>'+d.file_size_h+'</span></div>'
+        + '<div class="kv"><b>逻辑容量</b><span>'+d.logical_size_h+'</span></div>';
+  if(d.udif){
+    h += '<div class="kv"><b>UDIF 版本</b><span>v'+d.udif.version+' · '+esc(d.udif.flags)+'</span></div>'
+      +  '<div class="kv"><b>分段</b><span>'+esc(d.udif.segment)+'</span></div>'
+      +  '<div class="kv"><b>块运行数</b><span>'+d.udif.runs+'</span></div>'
+      +  '<div class="kv"><b>压缩方式</b><span>'+Object.entries(d.udif.run_types).map(([k,v])=>k+'×'+v).join(', ')+'</span></div>';
+  }
+  h += '<div class="sec"><h3>分区表 ('+d.partitions.length+')</h3>';
+  if(!d.partitions.length) h += '<div class="muted">无分区表 · 整盘卷</div>';
+  for(const p of d.partitions) h += '<div class="row"><div class="t">'+esc(p.name||'#')+' '+p.i+'</div>'
+    + '<div class="d">'+esc(p.type)+' · '+p.size+'</div></div>';
+  h += '</div><div class="sec"><h3>卷 ('+d.volumes.length+')</h3>';
+  if(!d.volumes.length) h += '<div class="muted">未发现 HFS+ 卷</div>';
+  for(const v of d.volumes) h += '<div class="row"><div class="t">'+esc(v.name)+' <span class="badge">'+esc(v.fs)+'</span></div>'
+    + '<div class="d">'+v.size+' · '+v.files+' 文件 / '+v.folders+' 目录</div></div>';
+  h += '</div>';
+  if(d.errors && d.errors.length) h += '<div class="err">'+esc(d.errors.join('\n'))+'</div>';
+  $('info').innerHTML = h;
+}
+
+async function loadDir(dir){
+  status('读取目录 /'+dir+' …');
+  const d = await api('/api/list?'+q({image:IMG, dir:dir}));
+  if(!d.ok) throw new Error(d.error);
+  if(dir !== DIR){ HISTORY.push(DIR); DIR = dir; }
+  ITEMS = d.items; SEL = null;
+  $('crumb').textContent = '/' + (d.dir||'');
+  $('btnDownload').disabled = true;
+  renderItems();
+  status('目录 /'+d.dir+' 共 '+d.count+' 项');
+}
+
+function renderItems(){
+  const term = $('filter').value.toLowerCase();
+  const rows = ITEMS.filter(x => !term || x.name.toLowerCase().includes(term));
+  let h = '';
+  for(let i=0;i<rows.length;i++){
+    const x = rows[i];
+    const folder = x.kind === 'folder';
+    h += '<tr class="'+(folder?'folder ':'')+(SEL===x.path?'sel':'')+'" data-i="'+ITEMS.indexOf(x)+'">'
+      + '<td><span class="icon">'+(folder?'▸':'·')+'</span>'+esc(x.name)+'</td>'
+      + '<td class="muted">'+(folder?'文件夹':'文件')+'</td>'
+      + '<td class="right muted">'+(folder?'—':esc(x.size_h))+'</td>'
+      + '<td class="right muted">'+(folder?x.children:'—')+'</td></tr>';
+  }
+  if(!rows.length) h = '<tr><td colspan="4" class="empty">没有匹配项</td></tr>';
+  $('tbody').innerHTML = h;
+  $('tbody').querySelectorAll('tr[data-i]').forEach(tr => {
+    tr.onclick = () => {
+      const x = ITEMS[+tr.dataset.i];
+      SEL = x; renderItems();
+      $('btnDownload').disabled = x.kind === 'folder';
+      status('已选中：'+x.name+'  ('+(x.kind==='folder'?'文件夹':x.size_h)+')');
+    };
+    tr.ondblclick = () => {
+      const x = ITEMS[+tr.dataset.i];
+      if(x.kind === 'folder') loadDir(x.path).catch(e=>status('错误：'+e.message));
+    };
+  });
+}
+
+$('btnOpen').onclick = openImage;
+$('path').onkeydown = e => { if(e.key === 'Enter') openImage(); };
+$('btnDemo').onclick = () => {
+  const last = localStorage.getItem('omd_last');
+  if(last){ $('path').value = last; status('已填入上次路径：'+last); }
+  else status('暂无历史路径，请手动粘贴 DMG 完整路径');
+};
+$('btnReload').onclick = () => loadDir(DIR).catch(e=>status('错误：'+e.message));
+$('btnUp').onclick = () => {
+  if(HISTORY.length) loadDir(HISTORY.pop()).catch(e=>status('错误：'+e.message));
+};
+$('filter').oninput = renderItems;
+$('btnDownload').onclick = () => {
+  if(!SEL || SEL.kind === 'folder') return;
+  status('正在导出 '+SEL.name+' …');
+  const url = '/api/download?'+q({image:IMG, path:SEL.path});
+  fetch(url).then(r => r.blob()).then(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = SEL.name.replace(/[\\/:*?"<>|\x00-\x1f]/g,'_');
+    a.click(); URL.revokeObjectURL(a.href);
+    status('已导出：'+SEL.name+' ('+hum(b.size)+')');
+  }).catch(e => status('导出失败：'+e.message));
+};
+const saved = localStorage.getItem('omd_last');
+if(saved) $('path').value = saved;
+</script>
+</body>
+</html>

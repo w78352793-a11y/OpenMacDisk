@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenMacDisk · 产品介绍</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1f2733; --muted:#5b6675;
+    --line:#e3e8ef; --brand:#2563eb; --brand2:#0ea5e9; --ok:#16a34a;
+    --chip:#eef2ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.65;}
+  .wrap{max-width:880px;margin:0 auto;padding:40px 24px 64px;}
+  header.hero{background:linear-gradient(135deg,var(--brand),var(--brand2));
+    color:#fff;border-radius:18px;padding:36px 32px;box-shadow:0 12px 30px rgba(37,99,235,.25);}
+  header.hero h1{margin:0 0 8px;font-size:30px;letter-spacing:.5px}
+  header.hero p{margin:0;opacity:.95;font-size:15px}
+  .tag{display:inline-block;margin-top:14px;background:rgba(255,255,255,.18);
+    border:1px solid rgba(255,255,255,.35);padding:5px 12px;border-radius:999px;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:24px 26px;margin-top:22px;box-shadow:0 4px 14px rgba(15,23,42,.04)}
+  h2{font-size:19px;margin:0 0 14px;display:flex;align-items:center;gap:9px}
+  h2 .dot{width:9px;height:9px;border-radius:50%;background:var(--brand)}
+  ul{margin:0;padding-left:20px}
+  li{margin:7px 0}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .feat{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:#fbfdff}
+  .feat b{color:var(--brand)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border:1px solid var(--line);padding:10px 12px;text-align:left}
+  th{background:#f1f5f9;color:var(--muted);font-weight:600}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .pill.ok{background:#dcfce7;color:var(--ok)}
+  .pill.ro{background:#fef3c7;color:#b45309}
+  .pill.rw{background:#dbeafe;color:#1d4ed8}
+  code{background:var(--chip);padding:2px 7px;border-radius:6px;font-size:13px;color:#334155}
+  footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
+  .note{border-left:4px solid var(--brand2);background:#f0f9ff;padding:12px 16px;border-radius:8px;margin-top:12px;font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>OpenMacDisk</h1>
+    <p>在 Windows 上浏览、提取与制作 macOS 磁盘镜像（.dmg）的轻量原生工具</p>
+    <span class="tag">当前版本 v1.4.3 · 便携版 · 免安装</span>
+  </header>
+
+  <div class="card">
+    <h2><span class="dot"></span>产品定位</h2>
+    <p>OpenMacDisk 是一款面向 Windows 平台的 macOS 磁盘镜像处理工具。它无需安装、单文件运行，
+       让用户在 Windows 资源管理器之外，直接查看 <code>.dmg</code> 镜像内部的目录与文件结构，
+       提取所需文件，并可将文件夹重新封装为标准 DMG。所有生成的镜像均保持与 macOS 原生格式一致，
+       可在 Mac 上正常挂载打开。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>核心功能</h2>
+    <div class="grid">
+      <div class="feat"><b>镜像浏览</b><br>打开各类 DMG，树状展示卷内目录与文件，支持中文、俄文等 Unicode 文件名。</div>
+      <div class="feat"><b>文件提取</b><br>将镜像内的任意文件/文件夹导出到 Windows 磁盘。</div>
+      <div class="feat"><b>eXpand 展开</b><br>把压缩的只读 DMG 展开为未压缩、可直接编辑的镜像副本。</div>
+      <div class="feat"><b>Compress 封装</b><br>把文件夹或镜像重新封装为只读 / 未压缩的 DMG。</div>
+      <div class="feat"><b>多语言</b><br>内置简体中文 / 英文界面，可随时切换。</div>
+      <div class="feat"><b>外观主题</b><br>亮色、暗色、透明玻璃、磨砂玻璃四种窗口风格自由切换。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>格式兼容性</h2>
+    <table>
+      <tr><th>镜像封装</th><th>分区方案</th><th>文件系统</th><th>支持方式</th></tr>
+      <tr><td>UDIF (.dmg)</td><td>GPT</td><td>APFS</td><td><span class="pill ro">只读浏览 / 提取</span></td></tr>
+      <tr><td>UDIF (.dmg)</td><td>APM / 整盘卷</td><td>HFS+ / HFSX</td><td><span class="pill rw">可读写编辑</span></td></tr>
+    </table>
+    <div class="note">说明：HFS+/HFSX 卷支持向镜像内添加文件；APFS 卷当前为只读（浏览与提取），
+       写入支持将在后续版本规划。所有解析均为对公开磁盘格式规范的独立实现。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>技术亮点</h2>
+    <ul>
+      <li><b>逐字节保真</b>：展开 / 重封装产物与原生格式一致，Mac 可正常挂载，不破坏镜像结构。</li>
+      <li><b>真正便携</b>：单文件 EXE，配置与设置保存在程序同目录，可放入 U 盘带走、换机即用。</li>
+      <li><b>原生体验</b>：基于 Windows 原生 GUI 与系统图标，启动快、占用小（约 20 MB）。</li>
+      <li><b>格式覆盖面广</b>：GPT / APM 分区、HFS+、APFS 多类真实镜像均已验证可打开。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>便携版使用说明</h2>
+    <ul>
+      <li>将 <code>OpenMacDisk</code> 文件夹整体复制到任意位置（如桌面、U 盘）。</li>
+      <li>双击 <code>OpenMacDisk.exe</code> 即可运行，无需安装、不写注册表。</li>
+      <li>你的语言与外观设置会自动保存在该文件夹内的 <code>config.json</code>，随文件夹一起移动。</li>
+    </ul>
+  </div>
+
+  <footer>OpenMacDisk v1.4.3 · 独立实现的 macOS 磁盘镜像工具 · 仅供合法授权的镜像处理用途</footer>
+
+</div>
+</body>
+</html>
