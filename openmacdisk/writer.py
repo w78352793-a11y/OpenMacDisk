@@ -759,12 +759,30 @@ def _build_xml(runs: list[tuple], sector_count: int,
 def _koly(data_len: int, xml_off: int, xml_len: int,
           sector_count: int, template: dict | None = None,
           rsrc_off: int = 0, rsrc_len: int = 0,
-          master_checksum: bytes | None = None) -> bytes:
+          master_checksum: bytes | None = None,
+          data_fork_crc: int | None = None) -> bytes:
     if template:
         t = bytearray(template['koly'][:512])
-        # DataForkChecksum 沿用源值（Apple 通常为 type=0 / 全 0，表示不提供）。
-        # 主校验和只在逻辑盘内容未变时可沿用，过期的值必须清零，否则 macOS
-        # 会拿一个不匹配的 CRC 去校验整盘并拒绝挂载。
+        # DataForkChecksum 覆盖的是数据叉本身：只要重排/压缩过，源值就过期。
+        # - 源本来就不提供（type=0）：原样保留，保证 create→eXpand→Compress
+        #   的逐字节一致性；
+        # - 源提供 type=2：按实际写出的数据叉重算 CRC32（无编辑往返时算出来
+        #   与源值相同）。拿不到 CRC 时清零为 type=0，macOS 会跳过校验，
+        #   而不是拿一个不匹配的值拒绝挂载。
+        src_type, src_size = struct.unpack_from('>II', t, 0x50)
+        if src_type == 2 and src_size == 32:
+            src_crc = struct.unpack_from('>I', t, 0x58)[0]
+            if data_fork_crc is not None:
+                new_crc = data_fork_crc & 0xFFFFFFFF
+                if new_crc != src_crc:
+                    # koly 前 0x160 字节变了，源主校验和随之失效
+                    master_checksum = None
+                t[0x58:0xD8] = bytes(0xD8 - 0x58)
+                struct.pack_into('>I', t, 0x58, new_crc)
+            else:
+                t[0x50:0xD8] = bytes(0xD8 - 0x50)
+                master_checksum = None
+        # 主校验和只在逻辑盘内容未变时可沿用，过期的值必须清零。
         t[0x160:0x1E8] = master_checksum or bytes(0x1E8 - 0x160)
     else:
         t = bytearray(512)
@@ -782,7 +800,8 @@ def _koly(data_len: int, xml_off: int, xml_len: int,
 
 def _write_trailer(fo, runs: list[tuple], data_len: int,
                    sector_count: int, template: dict | None,
-                   crc32_value: int | None) -> None:
+                   crc32_value: int | None,
+                   data_fork_crc: int | None = None) -> None:
     # Apple 的标准尾部顺序：数据叉 | XML plist | 二进制资源叉 | koly。
     # 以前少写了资源叉，koly 只能把 RsrcFork 填 0，第三方解析器既读不到
     # 分区资源，又会因为沿用源文件的越界偏移直接拒绝打开。
@@ -793,7 +812,8 @@ def _write_trailer(fo, runs: list[tuple], data_len: int,
     fo.write(rsrc)
     fo.write(_koly(data_len, data_len, len(xml), sector_count, template,
                    data_len + len(xml), len(rsrc),
-                   _master_checksum(template, crc32_value)))
+                   _master_checksum(template, crc32_value),
+                   data_fork_crc))
 
 
 def write_udif(out_path: str, raw_path: str, volume_name: str = 'Untitled',
@@ -951,6 +971,7 @@ def expand_to_editable_dmg(image_path: str, out_path: str, cb=None) -> int:
         runs: list[tuple] = []
         data_len = 0
         crc = 0
+        data_crc = 0
         pos = 0
         with open(dst, 'wb') as fo:
             while pos < total:
@@ -964,12 +985,13 @@ def expand_to_editable_dmg(image_path: str, out_path: str, cb=None) -> int:
                 runs.append((BLOCK_RAW, pos // SECTOR, count,
                              data_len, len(raw)))
                 fo.write(raw)
+                data_crc = zlib.crc32(raw, data_crc)
                 data_len += len(raw)
                 pos += len(buf)
                 cb(90 * min(1.0, pos / max(1, total)),
                    '展开 %s / %s' % (_hum(pos), _hum(total)))
             _write_trailer(fo, runs, data_len, sector_count, template,
-                           crc & 0xFFFFFFFF)
+                           crc & 0xFFFFFFFF, data_crc & 0xFFFFFFFF)
     cb(100, 'eXpand 完成')
     return os.path.getsize(dst)
 
@@ -1004,6 +1026,7 @@ def compress_to_dmg(image_path: str, out_path: str, cb=None) -> int:
         runs: list[tuple] = []
         data_len = 0
         crc = 0
+        data_crc = 0
         pos = 0
         with open(dst, 'wb') as fo:
             while pos < total:
@@ -1022,12 +1045,13 @@ def compress_to_dmg(image_path: str, out_path: str, cb=None) -> int:
                 runs.append((typ, pos // SECTOR, count,
                              data_len, len(payload)))
                 fo.write(payload)
+                data_crc = zlib.crc32(payload, data_crc)
                 data_len += len(payload)
                 pos += len(buf)
                 cb(90 * min(1.0, pos / max(1, total)),
                    '压缩 %s / %s' % (_hum(pos), _hum(total)))
             _write_trailer(fo, runs, data_len, sector_count, template,
-                           crc & 0xFFFFFFFF)
+                           crc & 0xFFFFFFFF, data_crc & 0xFFFFFFFF)
     cb(100, 'Compress 完成')
     return os.path.getsize(dst)
 
